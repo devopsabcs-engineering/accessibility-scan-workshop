@@ -1,0 +1,7 @@
+title: Accessibility Scan Workshop
+description: >-
+  Learn to scan web applications for WCAG 2.2 accessibility violations
+  using axe-core, IBM Equal Access, and custom Playwright checks.
+theme: jekyll-theme-minimal
+plugins:
+  - jekyll-relative-links
