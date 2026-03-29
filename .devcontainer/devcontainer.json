@@ -1,0 +1,28 @@
+{
+  "name": "Accessibility Scan Workshop",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/powershell:1": {}
+  },
+  "forwardPorts": [3000, 8001, 8002, 8003, 8004, 8005],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "pwsh"
+      },
+      "extensions": [
+        "ms-playwright.playwright",
+        "deque-systems.vscode-axe-linter",
+        "ms-azuretools.vscode-docker",
+        "GitHub.copilot"
+      ]
+    }
+  },
+  "remoteUser": "node"
+}
