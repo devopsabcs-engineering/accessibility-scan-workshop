@@ -58,8 +58,51 @@ param(
 
     [Parameter()]
     [ValidateSet('', '1', '2', '3')]
-    [string]$Phase = ''
+    [string]$Phase = '',
+
+    [Parameter()]
+    [ValidateSet('local', 'azure')]
+    [string]$Environment = 'azure',
+
+    [Parameter()]
+    [string]$ScannerUrl = '',
+
+    [Parameter()]
+    [hashtable]$AppUrls = @{}
 )
+
+# ── URL Resolution ───────────────────────────────────────────────────────────
+if (-not $ScannerUrl) {
+    $ScannerUrl = if ($Environment -eq 'azure') {
+        'https://a11y-scan-demo-7yt3mwgxp3wiy-app.azurewebsites.net'
+    } else {
+        'http://localhost:3000'
+    }
+}
+
+$DefaultAppUrls = if ($Environment -eq 'azure') {
+    @{
+        '001' = 'https://a11y-demo-app-001-bnf6htmx2apog-app.azurewebsites.net'
+        '002' = 'https://a11y-demo-app-002-tqo46d2qcc74q-app.azurewebsites.net'
+        '003' = 'https://a11y-demo-app-003-o3nuquxlwptes-app.azurewebsites.net'
+        '004' = 'https://a11y-demo-app-004-kpuhb2igkkuxg-app.azurewebsites.net'
+        '005' = 'https://a11y-demo-app-005-4l6i3v3ihhr4y-app.azurewebsites.net'
+    }
+} else {
+    @{
+        '001' = 'http://localhost:8001'
+        '002' = 'http://localhost:8002'
+        '003' = 'http://localhost:8003'
+        '004' = 'http://localhost:8004'
+        '005' = 'http://localhost:8005'
+    }
+}
+
+foreach ($key in $DefaultAppUrls.Keys) {
+    if (-not $AppUrls.ContainsKey($key)) {
+        $AppUrls[$key] = $DefaultAppUrls[$key]
+    }
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -234,6 +277,97 @@ function Invoke-PlaywrightScreenshot {
         else {
             $script:FailureCount++
             Write-Host "    FAIL: $OutputFile (playwright returned $LASTEXITCODE)" -ForegroundColor Red
+        }
+    }
+    catch {
+        $script:FailureCount++
+        Write-Host "    FAIL: $OutputFile ($_)" -ForegroundColor Red
+    }
+}
+
+function Invoke-InteractiveScanCapture {
+    <#
+    .SYNOPSIS
+        Capture interactive scan results via playwright-helpers.js scan action.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$ScannerUrl,
+
+        [Parameter(Mandatory)]
+        [string]$TargetUrl,
+
+        [Parameter(Mandatory)]
+        [string]$OutputFile,
+
+        [Parameter()]
+        [string]$Action = 'results',
+
+        [Parameter()]
+        [int]$Timeout = 120000,
+
+        [Parameter()]
+        [string]$Description = ''
+    )
+
+    Write-Host "  Capturing: $Description" -ForegroundColor Gray
+    try {
+        $nodeArgs = @('scripts/playwright-helpers.js', 'scan', $ScannerUrl, $TargetUrl, $OutputFile, '--action', $Action, '--timeout', $Timeout)
+        & node @nodeArgs 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $OutputFile)) {
+            $script:CaptureCount++
+            Write-Host "    OK: $OutputFile" -ForegroundColor Green
+        }
+        else {
+            $script:FailureCount++
+            Write-Host "    FAIL: $OutputFile (interactive capture returned $LASTEXITCODE)" -ForegroundColor Red
+        }
+    }
+    catch {
+        $script:FailureCount++
+        Write-Host "    FAIL: $OutputFile ($_)" -ForegroundColor Red
+    }
+}
+
+function Invoke-AuthenticatedPlaywrightScreenshot {
+    <#
+    .SYNOPSIS
+        Capture authenticated browser page via playwright-helpers.js auth-screenshot action.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$Url,
+
+        [Parameter(Mandatory)]
+        [string]$OutputFile,
+
+        [Parameter(Mandatory)]
+        [string]$StorageState,
+
+        [Parameter()]
+        [switch]$FullPage,
+
+        [Parameter()]
+        [string]$Description = ''
+    )
+
+    if (-not (Test-Path $StorageState)) {
+        Write-Host "    SKIP (no auth state): $Description" -ForegroundColor DarkYellow
+        return
+    }
+
+    Write-Host "  Capturing: $Description" -ForegroundColor Gray
+    try {
+        $nodeArgs = @('scripts/playwright-helpers.js', 'auth-screenshot', $Url, $OutputFile, $StorageState)
+        if ($FullPage) { $nodeArgs += '--full-page' }
+        & node @nodeArgs 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $OutputFile)) {
+            $script:CaptureCount++
+            Write-Host "    OK: $OutputFile" -ForegroundColor Green
+        }
+        else {
+            $script:FailureCount++
+            Write-Host "    FAIL: $OutputFile (auth capture returned $LASTEXITCODE)" -ForegroundColor Red
         }
     }
     catch {
@@ -548,7 +682,7 @@ if (Test-ShouldCapture -Lab '07' -CapturePhase '1') {
     }
 }
 
-# ── Phase 2: Azure-Deployed Captures ────────────────────────────────────────
+# ── Phase 2: App-Dependent Captures ─────────────────────────────────────────
 # Screenshots requiring demo apps running (locally or deployed to Azure)
 
 Write-Host "`n── Phase 2: App-Dependent Captures ──" -ForegroundColor Cyan
@@ -559,9 +693,9 @@ if (Test-ShouldCapture -Lab '00' -CapturePhase '2') {
     $lab00Dir = New-LabDirectory -Lab '00'
 
     Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+        -Url $ScannerUrl `
         -OutputFile (Join-Path $lab00Dir 'lab-00-scanner-home.png') `
-        -Description 'Scanner home page (localhost:3000)'
+        -Description "Scanner home page ($ScannerUrl)"
 }
 
 # Lab 01: Demo app pages
@@ -570,14 +704,16 @@ if (Test-ShouldCapture -Lab '01' -CapturePhase '2') {
     $lab01Dir = New-LabDirectory -Lab '01'
 
     $demoApps = @(
-        @{ Name = '001'; Port = 8001; Title = 'Travel Booking' }
-        @{ Name = '002'; Port = 8002; Title = 'E-Commerce' }
-        @{ Name = '003'; Port = 8003; Title = 'Learning Platform' }
+        @{ Name = '001'; Title = 'Travel Booking' }
+        @{ Name = '002'; Title = 'E-Commerce' }
+        @{ Name = '003'; Title = 'Learning Platform' }
+        @{ Name = '004'; Title = 'Recipe Site' }
+        @{ Name = '005'; Title = 'Fitness Tracker' }
     )
 
     foreach ($app in $demoApps) {
         Invoke-PlaywrightScreenshot `
-            -Url "http://localhost:$($app.Port)" `
+            -Url $AppUrls[$app.Name] `
             -OutputFile (Join-Path $lab01Dir "lab-01-demo-app-$($app.Name).png") `
             -Description "Demo app $($app.Name) ($($app.Title))" `
             -FullPage
@@ -585,13 +721,13 @@ if (Test-ShouldCapture -Lab '01' -CapturePhase '2') {
 
     # Capture popup violation on app 001
     Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:8001' `
+        -Url $AppUrls['001'] `
         -OutputFile (Join-Path $lab01Dir 'lab-01-violations-popup.png') `
         -Description 'Popup modal violation (app 001)'
 
     # DevTools audit is a browser screenshot
     Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:8001' `
+        -Url $AppUrls['001'] `
         -OutputFile (Join-Path $lab01Dir 'lab-01-devtools-audit.png') `
         -Description 'DevTools accessibility audit placeholder'
 }
@@ -601,27 +737,33 @@ if (Test-ShouldCapture -Lab '02' -CapturePhase '2') {
     Write-Host "`n[Lab 02] Scanner web UI" -ForegroundColor Yellow
     $lab02Dir = New-LabDirectory -Lab '02'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab02Dir 'lab-02-web-ui-scan.png') `
+        -Action 'progress' `
         -Description 'Web UI scan in progress'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab02Dir 'lab-02-scan-results.png') `
-        -Description 'Scan results overview' `
-        -FullPage
+        -Action 'results' `
+        -Description 'Scan results overview'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab02Dir 'lab-02-violation-detail.png') `
+        -Action 'detail' `
         -Description 'Violation detail view'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab02Dir 'lab-02-multi-app-comparison.png') `
-        -Description 'Multi-app scan comparison' `
-        -FullPage
+        -Action 'comparison' `
+        -Description 'Multi-app scan comparison'
 }
 
 # Lab 03: IBM scan results pages
@@ -629,21 +771,26 @@ if (Test-ShouldCapture -Lab '03' -CapturePhase '2') {
     Write-Host "`n[Lab 03] IBM Equal Access scan results" -ForegroundColor Yellow
     $lab03Dir = New-LabDirectory -Lab '03'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab03Dir 'lab-03-ibm-scan-results.png') `
+        -Action 'results' `
         -Description 'IBM Equal Access scan results'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab03Dir 'lab-03-ibm-violation-detail.png') `
+        -Action 'detail' `
         -Description 'IBM violation detail'
 
-    Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:3000' `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab03Dir 'lab-03-combined-report.png') `
-        -Description 'Combined report output' `
-        -FullPage
+        -Action 'results' `
+        -Description 'Combined report output'
 }
 
 # Lab 04: Keyboard navigation testing
@@ -652,7 +799,7 @@ if (Test-ShouldCapture -Lab '04' -CapturePhase '2') {
     $lab04Dir = New-LabDirectory -Lab '04'
 
     Invoke-PlaywrightScreenshot `
-        -Url 'http://localhost:8001' `
+        -Url $AppUrls['001'] `
         -OutputFile (Join-Path $lab04Dir 'lab-04-keyboard-test.png') `
         -Description 'Keyboard navigation testing on demo app 001'
 }
@@ -664,30 +811,39 @@ Write-Host "`n── Phase 3: GitHub Web UI Captures ──" -ForegroundColor Cy
 
 $GitHubBaseUrl = "https://github.com/$Org/accessibility-scan-demo-app"
 
+if (-not (Test-Path $GitHubAuthState)) {
+    Write-Host "  Auth state not found at '$GitHubAuthState'. Phase 3 captures will be skipped." -ForegroundColor Yellow
+    Write-Host "  To set up auth: npx playwright codegen --save-storage=$GitHubAuthState github.com" -ForegroundColor Yellow
+}
+
 # Lab 05: Security tab screenshots
 if (Test-ShouldCapture -Lab '05' -CapturePhase '3') {
     Write-Host "`n[Lab 05] GitHub Security tab" -ForegroundColor Yellow
     $lab05Dir = New-LabDirectory -Lab '05'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/security/code-scanning" `
         -OutputFile (Join-Path $lab05Dir 'lab-05-security-tab.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Security tab code scanning alerts' `
         -FullPage
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/security/code-scanning" `
         -OutputFile (Join-Path $lab05Dir 'lab-05-alert-detail.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Alert detail view'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/security/code-scanning?query=severity%3Ahigh" `
         -OutputFile (Join-Path $lab05Dir 'lab-05-filter-severity.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Filter by severity'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/security/code-scanning" `
         -OutputFile (Join-Path $lab05Dir 'lab-05-triage-view.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Triage view'
 }
 
@@ -696,20 +852,23 @@ if (Test-ShouldCapture -Lab '06' -CapturePhase '3') {
     Write-Host "`n[Lab 06] GitHub Actions pages" -ForegroundColor Yellow
     $lab06Dir = New-LabDirectory -Lab '06'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/actions" `
         -OutputFile (Join-Path $lab06Dir 'lab-06-actions-runs.png') `
+        -StorageState $GitHubAuthState `
         -Description 'GitHub Actions runs page' `
         -FullPage
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/actions" `
         -OutputFile (Join-Path $lab06Dir 'lab-06-matrix-jobs.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Matrix jobs running'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/actions" `
         -OutputFile (Join-Path $lab06Dir 'lab-06-deploy-status.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Deploy status'
 }
 
@@ -718,19 +877,22 @@ if (Test-ShouldCapture -Lab '07' -CapturePhase '3') {
     Write-Host "`n[Lab 07] Remediation workflow" -ForegroundColor Yellow
     $lab07Dir = New-LabDirectory -Lab '07'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/pulls" `
         -OutputFile (Join-Path $lab07Dir 'lab-07-remediation-pr.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Remediation pull request'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl" `
         -OutputFile (Join-Path $lab07Dir 'lab-07-before-after.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Before/after score comparison'
 
-    Invoke-PlaywrightScreenshot `
+    Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl" `
         -OutputFile (Join-Path $lab07Dir 'lab-07-score-improvement.png') `
+        -StorageState $GitHubAuthState `
         -Description 'Score improvement chart'
 }
 

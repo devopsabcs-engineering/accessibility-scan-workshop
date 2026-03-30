@@ -76,6 +76,10 @@ You will build and run the first demo app locally to explore its violations.
 > ![Demo app 002 home page](../images/lab-01/lab-01-demo-app-002.png)
 >
 > ![Demo app 003 home page](../images/lab-01/lab-01-demo-app-003.png)
+>
+> ![Demo app 004 home page](../images/lab-01/lab-01-demo-app-004.png)
+>
+> ![Demo app 005 home page](../images/lab-01/lab-01-demo-app-005.png)
 
 ### Exercise 1.3: Identify Visible Violations
 

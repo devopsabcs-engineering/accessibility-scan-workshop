@@ -8,6 +8,8 @@ Screenshots referenced by [Lab 01](../../labs/lab-01.md).
 | lab-01-demo-app-001.png | Demo app 001 home page (Travel Booking) | playwright | 2 |
 | lab-01-demo-app-002.png | Demo app 002 home page (E-Commerce) | playwright | 2 |
 | lab-01-demo-app-003.png | Demo app 003 home page (Learning Platform) | playwright | 2 |
+| lab-01-demo-app-004.png | Demo app 004 home page (Recipe Site) | playwright | 2 |
+| lab-01-demo-app-005.png | Demo app 005 home page (Fitness Tracker) | playwright | 2 |
 | lab-01-violations-popup.png | Popup modal violation in demo app 001 | playwright | 2 |
 | lab-01-devtools-audit.png | Chrome DevTools accessibility audit | playwright | 2 |
 | lab-01-wcag-mapping.png | WCAG POUR principle mapping | freeze-file | 1 |
