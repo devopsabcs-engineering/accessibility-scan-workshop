@@ -2,6 +2,9 @@
 node_modules/
 npm-debug.log*
 
+# Copilot tracking
+.copilot-tracking/
+
 # Jekyll
 _site/
 .sass-cache/
