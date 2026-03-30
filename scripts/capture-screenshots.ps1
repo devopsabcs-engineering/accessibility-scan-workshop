@@ -193,11 +193,14 @@ function Invoke-CapturedFreezeScreenshot {
     Write-Host "  Capturing: $Description" -ForegroundColor Gray
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
+        $savedDir = (Get-Location).Path
+        $absOutput = if ([System.IO.Path]::IsPathRooted($OutputFile)) { $OutputFile } else { Join-Path $savedDir $OutputFile }
         $output = Invoke-Expression $Command 2>&1
+        Set-Location $savedDir
         $output | Out-File -FilePath $tempFile -Encoding utf8
-        $freezeArgs = @('--output', $OutputFile, '--language', 'text') + $FreezeCommon + @($tempFile)
+        $freezeArgs = @('--output', $absOutput, '--language', 'text') + $FreezeCommon + @($tempFile)
         & freeze @freezeArgs 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0 -and (Test-Path $OutputFile)) {
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $absOutput)) {
             $script:CaptureCount++
             Write-Host "    OK: $OutputFile" -ForegroundColor Green
         }
@@ -208,6 +211,8 @@ function Invoke-CapturedFreezeScreenshot {
         Remove-Item $tempFile -ErrorAction SilentlyContinue
     }
     catch {
+        Set-Location $savedDir -ErrorAction SilentlyContinue
+        Remove-Item $tempFile -ErrorAction SilentlyContinue
         $script:FailureCount++
         Write-Host "    FAIL: $OutputFile ($_)" -ForegroundColor Red
     }
