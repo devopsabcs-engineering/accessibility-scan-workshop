@@ -6,6 +6,9 @@ description: "Set up your environment with all required tools for WCAG 2.2 acces
 
 # Lab 00: Prerequisites and Environment Setup
 
+> [!NOTE]
+> This workshop is part of the [Agentic Accelerator Framework](https://github.com/devopsabcs-engineering/agentic-accelerator-framework).
+
 | | |
 |---|---|
 | **Duration** | 30 minutes |

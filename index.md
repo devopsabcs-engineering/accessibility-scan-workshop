@@ -5,6 +5,9 @@ title: Home
 
 # Accessibility Scan Workshop
 
+> [!NOTE]
+> This workshop is part of the [Agentic Accelerator Framework](https://github.com/devopsabcs-engineering/agentic-accelerator-framework).
+
 Complete hands-on labs to learn WCAG 2.2 accessibility scanning using
 axe-core, IBM Equal Access, and custom Playwright checks.
 
