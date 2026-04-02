@@ -542,9 +542,9 @@ if (Test-ShouldCapture -Lab '03' -CapturePhase '1') {
     $lab03Dir = New-LabDirectory -Lab '03'
 
     if ($ScannerRepoDir) {
-        # Capture package.json showing accessibility-checker dependency
+        # Capture package.json showing scanner engine dependencies
         Invoke-CapturedFreezeScreenshot `
-            -Command "cd '$ScannerRepoDir'; Write-Output '=== Scanner Engine Comparison ==='; Write-Output ''; Write-Output 'axe-core:'; (Get-Content package.json | ConvertFrom-Json).dependencies.'axe-core'; Write-Output ''; Write-Output 'IBM Equal Access:'; (Get-Content package.json | ConvertFrom-Json).dependencies.'accessibility-checker'" `
+            -Command "cd '$ScannerRepoDir'; Write-Output '=== Scanner Engine Comparison ==='; Write-Output ''; `$deps = (Get-Content package.json | ConvertFrom-Json).dependencies; Write-Output ('axe-core (Playwright):  ' + `$deps.'@axe-core/playwright'); Write-Output ('IBM Equal Access:       ' + `$deps.'accessibility-checker'); Write-Output ''; Write-Output '=== Engine Differences ==='; Write-Output 'axe-core: WCAG 2.x rules, fast, widely adopted'; Write-Output 'IBM EAC:  IBM-specific policies, broader coverage'" `
             -OutputFile (Join-Path $lab03Dir 'lab-03-comparison-table.png') `
             -Description 'Scanner engine comparison (axe-core vs IBM)'
 
@@ -555,11 +555,10 @@ if (Test-ShouldCapture -Lab '03' -CapturePhase '1') {
         )
         foreach ($df in $dedupeFiles) {
             if (Test-Path $df) {
-                Invoke-FreezeFile `
-                    -FilePath $df `
+                Invoke-CapturedFreezeScreenshot `
+                    -Command "Get-Content '$df' -TotalCount 60" `
                     -OutputFile (Join-Path $lab03Dir 'lab-03-deduplication.png') `
-                    -Description 'Deduplication logic' `
-                    -Language 'typescript'
+                    -Description 'Deduplication logic (first 60 lines)'
                 break
             }
         }
@@ -575,11 +574,10 @@ if (Test-ShouldCapture -Lab '04' -CapturePhase '1') {
         # Capture custom-checks.ts source
         $customChecksFile = Join-Path $ScannerRepoDir 'src\lib\scanner\custom-checks.ts'
         if (Test-Path $customChecksFile) {
-            Invoke-FreezeFile `
-                -FilePath $customChecksFile `
+            Invoke-CapturedFreezeScreenshot `
+                -Command "Get-Content '$customChecksFile' -TotalCount 50" `
                 -OutputFile (Join-Path $lab04Dir 'lab-04-custom-checks-source.png') `
-                -Description 'Custom checks source code' `
-                -Language 'typescript'
+                -Description 'Custom checks source code (first 50 lines)'
         }
         else {
             Write-Host "  SKIP: custom-checks.ts not found" -ForegroundColor Yellow
@@ -588,30 +586,25 @@ if (Test-ShouldCapture -Lab '04' -CapturePhase '1') {
         # Capture a new check code example (use a11y-remediation instructions as reference)
         $remediationFile = Join-Path $ScannerRepoDir '.github\instructions\a11y-remediation.instructions.md'
         if (Test-Path $remediationFile) {
-            Invoke-FreezeFile `
-                -FilePath $remediationFile `
+            Invoke-CapturedFreezeScreenshot `
+                -Command "Get-Content '$remediationFile' -TotalCount 50" `
                 -OutputFile (Join-Path $lab04Dir 'lab-04-new-check-code.png') `
-                -Description 'Remediation patterns reference' `
-                -Language 'markdown'
+                -Description 'Remediation patterns reference (first 50 lines)'
         }
 
-        # Capture custom check implementation source
-        $customCheckResultsFile = Join-Path $ScannerRepoDir 'src\lib\scanner\custom-checks.ts'
-        if (Test-Path $customCheckResultsFile) {
-            Invoke-FreezeFile `
-                -FilePath $customCheckResultsFile `
+        # Capture result normalizer (distinct from custom-checks-source)
+        $resultNormalizerFile = Join-Path $ScannerRepoDir 'src\lib\scanner\result-normalizer.ts'
+        if (Test-Path $resultNormalizerFile) {
+            Invoke-CapturedFreezeScreenshot `
+                -Command "Get-Content '$resultNormalizerFile' -TotalCount 50" `
                 -OutputFile (Join-Path $lab04Dir 'lab-04-custom-check-results.png') `
-                -Description 'Custom check implementation results' `
-                -Language 'typescript'
+                -Description 'Custom check result normalizer (first 50 lines)'
         }
 
-        # Capture new check results from e2e fixtures or custom-checks source
-        $newCheckFile = Join-Path $ScannerRepoDir 'e2e\fixtures\custom-checks.ts'
+        # Capture axe fixture for new check patterns (distinct from custom-checks)
+        $newCheckFile = Join-Path $ScannerRepoDir 'e2e\fixtures\axe-fixture.ts'
         if (-not (Test-Path $newCheckFile)) {
-            $newCheckFile = Join-Path $ScannerRepoDir 'src\lib\scanner\checks\index.ts'
-        }
-        if (-not (Test-Path $newCheckFile)) {
-            $newCheckFile = Join-Path $ScannerRepoDir 'src\lib\scanner\custom-checks.ts'
+            $newCheckFile = Join-Path $ScannerRepoDir 'e2e\fixtures\threshold.ts'
         }
         if (Test-Path $newCheckFile) {
             Invoke-FreezeFile `
@@ -746,14 +739,13 @@ if (Test-ShouldCapture -Lab '06-ado' -CapturePhase '1' -CapturePlatform 'ado') {
     $lab06AdoDir = New-LabDirectory -Lab '06-ado'
 
     if ($ScannerRepoDir) {
-        # SARIF file content
+        # SARIF file content (first 40 lines to avoid freeze memory limit)
         $sarifFiles = Get-ChildItem -Path (Join-Path $ScannerRepoDir 'results') -Filter '*.json' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($sarifFiles) {
-            Invoke-FreezeFile `
-                -FilePath $sarifFiles.FullName `
+            Invoke-CapturedFreezeScreenshot `
+                -Command "Get-Content '$($sarifFiles.FullName)' -TotalCount 40" `
                 -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-sarif-file.png') `
-                -Description 'SARIF output file' `
-                -Language 'json'
+                -Description 'SARIF output file (first 40 lines)'
         }
 
         # Pipeline YAML
