@@ -12,6 +12,10 @@ description: "Use GitHub Copilot agents to detect, prioritize, and fix accessibi
 | **Level** | Advanced |
 | **Prerequisites** | [Lab 06](lab-06.md), GitHub Copilot access |
 
+> [!TIP]
+> This lab covers **GitHub-based** remediation workflows. For the Azure DevOps
+> pipeline variant, see [Lab 07-ado: ADO YAML Pipelines](lab-07-ado.md).
+
 ## Learning Objectives
 
 By the end of this lab, you will be able to:
@@ -231,13 +235,15 @@ You have completed all 8 labs in the Accessibility Scan Workshop. Here is a summ
 | **Lab 04** | Extended coverage with custom Playwright checks for issues automated engines miss |
 | **Lab 05** | Generated SARIF output and uploaded findings to the GitHub Security tab |
 | **Lab 06** | Built automated pipelines with matrix strategy, OIDC auth, and threshold gates |
+| **Lab 06-ado** | Configured ADO Advanced Security with SARIF integration (ADO track) |
 | **Lab 07** | Used Copilot agents to detect, prioritize, and fix accessibility violations |
+| **Lab 07-ado** | Built ADO YAML pipelines for automated accessibility scanning (ADO track) |
 
 You now have the skills to implement a complete accessibility scanning platform that:
 
 - **Scans web pages** using multiple engines (axe-core, IBM Equal Access, custom Playwright checks)
 - **Produces unified SARIF output** for all scan engines
-- **Integrates with GitHub Security tab** for centralized alert management
+- **Integrates with GitHub Security tab** or **ADO Advanced Security** for centralized alert management
 - **Enforces accessibility gates** in CI/CD pipelines with configurable thresholds
 - **Automates remediation** using AI-powered Copilot agents
-- **Runs automatically** on schedule and on-demand via GitHub Actions
+- **Runs automatically** on schedule and on-demand via GitHub Actions or ADO Pipelines

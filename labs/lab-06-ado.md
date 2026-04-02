@@ -1,0 +1,252 @@
+---
+permalink: /labs/lab-06-ado
+title: "Lab 06-ado: ADO Advanced Security and SARIF Integration"
+description: "Enable Azure DevOps Advanced Security, publish SARIF results via pipeline, and compare findings with GitHub Security."
+---
+
+# Lab 06-ado: ADO Advanced Security and SARIF Integration
+
+| | |
+|---|---|
+| **Duration** | 35 min |
+| **Level** | Intermediate |
+| **Prerequisites** | [Lab 05](lab-05.md) |
+| **Platform** | Azure DevOps |
+
+## Learning Objectives
+
+By the end of this lab, you will be able to:
+
+- Review SARIF output files from earlier scanning labs
+- Enable GHAzDO Advanced Security on an ADO project
+- Create an ADO YAML pipeline using AdvancedSecurity-Publish@1
+- Run the pipeline and monitor execution
+- View findings in the ADO Advanced Security Overview
+- Compare ADO Advanced Security with GitHub Security Tab
+
+## Exercises
+
+### Exercise 6.1: Review SARIF Output from Earlier Labs (5 min)
+
+You will review the SARIF files generated during Labs 02–05 to understand the structure before publishing them to ADO Advanced Security.
+
+1. Open one of the SARIF files from your earlier scan results (for example, `results/demo-001.sarif`).
+
+2. Review the SARIF v2.1.0 structure. Every SARIF file follows this schema:
+
+   ```json
+   {
+     "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+     "version": "2.1.0",
+     "runs": [
+       {
+         "tool": {
+           "driver": {
+             "name": "axe-core",
+             "version": "4.x",
+             "rules": [ ... ]
+           }
+         },
+         "results": [
+           {
+             "ruleId": "color-contrast",
+             "level": "error",
+             "message": { "text": "..." },
+             "locations": [ ... ]
+           }
+         ]
+       }
+     ]
+   }
+   ```
+
+3. Note the key elements:
+
+   | Element | Purpose |
+   |---------|---------|
+   | `$schema` | Declares SARIF v2.1.0 compliance |
+   | `runs[].tool.driver` | Identifies the scan engine (axe-core, IBM Equal Access, or custom) |
+   | `runs[].results[]` | Individual accessibility violations with severity, location, and message |
+
+   ![SARIF file JSON content](../images/lab-06-ado/lab-06-ado-sarif-file.png)
+
+4. Confirm you have at least one valid SARIF file. ADO Advanced Security consumes these files via the `AdvancedSecurity-Publish@1` pipeline task.
+
+### Exercise 6.2: Enable GHAzDO Advanced Security (10 min)
+
+You will enable Azure DevOps Advanced Security (GHAzDO) on the `AODA WCAG Compliance` project in the `MngEnvMCAP675646` organization.
+
+1. Navigate to your ADO project:
+
+   ```text
+   https://dev.azure.com/MngEnvMCAP675646/AODA%20WCAG%20Compliance
+   ```
+
+2. Open **Project Settings** (gear icon at the bottom-left of the ADO portal).
+
+3. Under **Repos**, select **Advanced Security**.
+
+   ![ADO Advanced Security settings panel](../images/lab-06-ado/lab-06-ado-advsec-settings.png)
+
+4. Enable Advanced Security at the **project level**:
+   - Toggle **Advanced Security** to **On**
+   - Review the billing notice — Advanced Security is billed per active committer
+   - Confirm the enablement
+
+5. Verify that Advanced Security is enabled for each repository in the project. Each repo shows an **Enabled** badge next to its name.
+
+   ![Enable Advanced Security confirmation](../images/lab-06-ado/lab-06-ado-advsec-enable.png)
+
+6. After enablement, you will see new menu items under **Advanced Security**:
+   - **Overview** — Dashboard showing alerts by severity
+   - **Alerts** — Detailed alert list with filtering
+
+### Exercise 6.3: Create ADO YAML Pipeline with AdvancedSecurity-Publish@1 (10 min)
+
+You will review the ADO YAML pipeline that publishes SARIF results to Advanced Security using the `AdvancedSecurity-Publish@1` task.
+
+1. Open `.azuredevops/pipelines/a11y-scan-advancedsecurity.yml` in your editor.
+
+2. Review the pipeline structure:
+
+   ```yaml
+   trigger:
+     branches:
+       include:
+         - main
+
+   pool:
+     vmImage: 'ubuntu-latest'
+
+   steps:
+     - checkout: self
+
+     - task: NodeTool@0
+       inputs:
+         versionSpec: '20.x'
+
+     - script: |
+         npm ci
+         npx playwright install --with-deps chromium
+       displayName: 'Install dependencies'
+
+     - script: |
+         npx ts-node src/cli/commands/scan.ts \
+           --url $(APP_URL) \
+           --format sarif \
+           --output $(Build.ArtifactStagingDirectory)/a11y-results.sarif
+       displayName: 'Run accessibility scan'
+
+     - task: AdvancedSecurity-Publish@1
+       inputs:
+         sarifInputFilePath: '$(Build.ArtifactStagingDirectory)/a11y-results.sarif'
+         category: 'accessibility'
+       displayName: 'Publish SARIF to Advanced Security'
+   ```
+
+3. Note the key elements of `AdvancedSecurity-Publish@1`:
+
+   | Input | Purpose |
+   |-------|---------|
+   | `sarifInputFilePath` | Path to the SARIF file generated by the scan step |
+   | `category` | Groups alerts under a category in the Advanced Security dashboard |
+
+   ![a11y-scan-advancedsecurity.yml content](../images/lab-06-ado/lab-06-ado-pipeline-yaml.png)
+
+4. The pipeline runs the accessibility scan and publishes results in a single job. ADO Advanced Security ingests the SARIF file and creates alerts for each finding.
+
+### Exercise 6.4: Run the Pipeline and Observe Execution (5 min)
+
+You will trigger the pipeline and monitor its execution in the ADO Pipelines UI.
+
+1. Navigate to **Pipelines** in the ADO portal.
+
+2. Select the **a11y-scan-advancedsecurity** pipeline.
+
+3. Click **Run pipeline** and accept the default branch (`main`).
+
+   ![Pipeline execution run view](../images/lab-06-ado/lab-06-ado-pipeline-run.png)
+
+4. Monitor the pipeline execution:
+   - Watch each step complete in the job view
+   - Click on individual steps to view their logs
+   - The **Publish SARIF to Advanced Security** step shows the upload status
+
+5. Review the pipeline logs for the publish step. You should see output confirming the SARIF file was ingested:
+
+   ```text
+   Uploading SARIF file: a11y-results.sarif
+   Category: accessibility
+   Results published to Advanced Security
+   ```
+
+   ![Pipeline logs showing SARIF upload](../images/lab-06-ado/lab-06-ado-pipeline-logs.png)
+
+6. Wait for the pipeline to complete successfully before proceeding.
+
+### Exercise 6.5: View Findings in ADO Advanced Security Overview (5 min)
+
+You will navigate to the Advanced Security dashboard and review the accessibility alerts.
+
+1. Navigate to **Advanced Security** → **Overview** in the ADO portal:
+
+   ```text
+   https://advsec.dev.azure.com/MngEnvMCAP675646/AODA%20WCAG%20Compliance/
+   ```
+
+2. The Overview dashboard displays:
+   - Total alert count
+   - Alerts grouped by severity (Critical, High, Medium, Low)
+   - Alerts grouped by tool (axe-core, IBM Equal Access, custom)
+   - Trend chart showing alerts over time
+
+   ![Advanced Security Overview dashboard](../images/lab-06-ado/lab-06-ado-advsec-overview.png)
+
+3. Click on **Alerts** to view the detailed alert list. Each alert shows:
+   - Rule ID and description
+   - Severity level
+   - File location and line number
+   - Tool that detected the violation
+
+   ![Alerts listed by severity](../images/lab-06-ado/lab-06-ado-advsec-alerts.png)
+
+4. Click on an individual alert to view its details, including the SARIF message, affected code location, and remediation guidance.
+
+### Exercise 6.6: Compare with GitHub Security Tab (5 min)
+
+You will compare the ADO Advanced Security experience with the GitHub Security Tab from Lab 05.
+
+1. Open the ADO Advanced Security Overview and the GitHub Security Tab side by side.
+
+2. Compare the following aspects:
+
+   | Aspect | GitHub Security Tab | ADO Advanced Security |
+   |--------|--------------------|-----------------------|
+   | **Alert grouping** | By tool and severity | By severity, tool, and category |
+   | **SARIF tool attribution** | Shows tool name from SARIF driver | Shows tool name and category |
+   | **Remediation workflow** | Create issue from alert, link to PR | Create work item from alert, link to AB# |
+   | **Alert dismissal** | Dismiss with reason | Close with resolution state |
+   | **API access** | REST API and GraphQL | REST API |
+
+3. Note the key difference in remediation workflows:
+   - GitHub uses **issues and pull requests** for tracking fixes
+   - ADO uses **work items and AB# linking** for tracking fixes (see Lab 07-ado for details)
+
+   ![Side-by-side GH Security vs ADO AdvSec](../images/lab-06-ado/lab-06-ado-comparison.png)
+
+4. Both platforms consume the same SARIF format, so the scan results are identical. The difference is in how each platform presents and manages the alerts.
+
+## Verification Checkpoint
+
+Before proceeding, verify:
+
+- [ ] Reviewed SARIF file structure and understand the v2.1.0 schema
+- [ ] Enabled GHAzDO Advanced Security on the ADO project
+- [ ] Reviewed the `AdvancedSecurity-Publish@1` pipeline YAML
+- [ ] Ran the pipeline and confirmed successful SARIF upload
+- [ ] Viewed alerts in the ADO Advanced Security Overview
+- [ ] Compared ADO Advanced Security with GitHub Security Tab
+
+## Next Steps
+
+Proceed to [Lab 07-ado: ADO YAML Pipelines for Accessibility Scanning](lab-07-ado.md).

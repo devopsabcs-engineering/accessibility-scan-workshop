@@ -23,7 +23,9 @@ graph LR
     L03 --> L05
     L04 --> L05
     L05 --> L06[Lab 06: GitHub Actions]
+    L05 --> L06A[Lab 06-ado: ADO AdvSec]
     L06 --> L07[Lab 07: Remediation]
+    L06A --> L07A[Lab 07-ado: ADO Pipelines]
 ```
 
 ## Lab Checklist
@@ -35,14 +37,19 @@ graph LR
 - [ ] [Lab 04: Custom Playwright Checks — Manual Inspection](labs/lab-04.md)
 - [ ] [Lab 05: SARIF Output and GitHub Security Tab](labs/lab-05.md)
 - [ ] [Lab 06: GitHub Actions Pipelines and Scan Gates](labs/lab-06.md)
+- [ ] [Lab 06-ado: ADO Advanced Security and SARIF Integration](labs/lab-06-ado.md)
 - [ ] [Lab 07: Remediation Workflows with Copilot Agents](labs/lab-07.md)
+- [ ] [Lab 07-ado: ADO YAML Pipelines for Accessibility Scanning](labs/lab-07-ado.md)
 
 ## Delivery Tiers
 
-| Tier | Labs | Duration | Azure Required |
-| --- | --- | --- | --- |
-| Half-Day | 00, 01, 02, 03, 05 | ~3 hours | No |
-| Full-Day | 00–07 (all) | ~6.5 hours | Yes |
+| Tier | Platform | Labs | Duration | Azure Required |
+| --- | --- | --- | --- | --- |
+| Half-Day (GitHub) | GitHub | 00, 01, 02, 03, 06 | ~3 hours | No |
+| Half-Day (ADO) | ADO | 00, 01, 02, 03, 06-ado | ~3 hours | Yes |
+| Full-Day (GitHub) | GitHub | 00–05, 06, 07 | ~6.5 hours | Yes |
+| Full-Day (ADO) | ADO | 00–05, 06-ado, 07-ado | ~7 hours | Yes |
+| Full-Day (Dual) | Both | 00–05, 06, 06-ado, 07, 07-ado | ~8.5 hours | Yes |
 
 ## Prerequisites
 

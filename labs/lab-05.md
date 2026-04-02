@@ -219,6 +219,11 @@ Before proceeding, verify:
 - [ ] Viewed accessibility alerts in the GitHub Security tab
 - [ ] Triaged at least 1 alert (dismissed or reviewed)
 
+> [!NOTE]
+> **Choose your path:** If you are following the GitHub track, continue to
+> [Lab 06: GitHub Actions](lab-06.md). If you are following the Azure DevOps
+> track, continue to [Lab 06-ado: ADO Advanced Security](lab-06-ado.md).
+
 ## Next Steps
 
 Proceed to [Lab 06: GitHub Actions Pipelines and Scan Gates](lab-06.md).

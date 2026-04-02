@@ -1,24 +1,42 @@
 <#
 .SYNOPSIS
-    Capture all workshop screenshots for Accessibility Scan Workshop labs 00-07.
+    Capture all workshop screenshots for Accessibility Scan Workshop labs 00-07
+    (GitHub track) and labs 06-ado/07-ado (ADO track).
 
 .DESCRIPTION
-    Automates screenshot capture for 8 workshop labs using Charm freeze (terminal
-    output) and Playwright (browser pages). Produces 47 PNG files organized into
-    images/lab-XX/ directories. Requires the demo apps to be running and all
-    prerequisite tools to be installed.
+    Automates screenshot capture for workshop labs using Charm freeze (terminal
+    output) and Playwright (browser pages). Produces PNG files organized into
+    images/lab-XX/ directories. Supports GitHub-only, ADO-only, or both platforms.
+
+    Phase 1 — Offline captures (freeze, freeze-file)
+    Phase 2 — App-dependent captures (Playwright, no auth)
+    Phase 3 — GitHub Web UI captures (authenticated Playwright)
+    Phase 4 — ADO Web UI captures (authenticated Playwright)
 
 .NOTES
     Prerequisites:
     - freeze (Charm CLI) installed — https://github.com/charmbracelet/freeze
     - Node.js and npx installed (for Playwright)
-    - GitHub CLI (gh) authenticated
+    - GitHub CLI (gh) authenticated (Phase 3 only)
+    - Azure DevOps auth state file (Phase 4 only)
     - Azure CLI (az) authenticated (Phase 2/3 only)
     - Scanner repo cloned at sibling directory
 
+.PARAMETER Platform
+    Which platform track to capture: 'github', 'ado', or 'both' (default).
+
+.PARAMETER AdoAuthState
+    Path to Playwright storage state JSON for ADO authentication (Phase 4).
+
+.PARAMETER AdoOrg
+    Azure DevOps organization name. Default: MngEnvMCAP675646.
+
+.PARAMETER AdoProject
+    Azure DevOps project name (URL-encoded). Default: AODA%20WCAG%20Compliance.
+
 .EXAMPLE
     .\scripts\capture-screenshots.ps1
-    Captures all 47 screenshots across 8 labs.
+    Captures all screenshots across all labs and platforms.
 
 .EXAMPLE
     .\scripts\capture-screenshots.ps1 -LabFilter '02'
@@ -27,6 +45,10 @@
 .EXAMPLE
     .\scripts\capture-screenshots.ps1 -Phase 1
     Captures only Phase 1 (offline) screenshots.
+
+.EXAMPLE
+    .\scripts\capture-screenshots.ps1 -Platform ado -Phase 4
+    Captures only Phase 4 ADO web UI screenshots.
 
 .EXAMPLE
     .\scripts\capture-screenshots.ps1 -Theme 'monokai' -FontSize 16
@@ -57,7 +79,7 @@ param(
     [string]$AzureAuthState = 'azure-auth.json',
 
     [Parameter()]
-    [ValidateSet('', '1', '2', '3')]
+    [ValidateSet('', '1', '2', '3', '4')]
     [string]$Phase = '',
 
     [Parameter()]
@@ -68,7 +90,20 @@ param(
     [string]$ScannerUrl = '',
 
     [Parameter()]
-    [hashtable]$AppUrls = @{}
+    [hashtable]$AppUrls = @{},
+
+    [Parameter()]
+    [ValidateSet('github', 'ado', 'both')]
+    [string]$Platform = 'both',
+
+    [Parameter()]
+    [string]$AdoAuthState = 'ado-auth.json',
+
+    [Parameter()]
+    [string]$AdoOrg = 'MngEnvMCAP675646',
+
+    [Parameter()]
+    [string]$AdoProject = 'AODA%20WCAG%20Compliance'
 )
 
 # ── URL Resolution ───────────────────────────────────────────────────────────
@@ -103,6 +138,10 @@ foreach ($key in $DefaultAppUrls.Keys) {
         $AppUrls[$key] = $DefaultAppUrls[$key]
     }
 }
+
+# ── ADO URL Resolution ───────────────────────────────────────────────────────
+$AdoBaseUrl = "https://dev.azure.com/$AdoOrg/$AdoProject"
+$AdoAdvSecUrl = "https://advsec.dev.azure.com/$AdoOrg/$AdoProject"
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -140,14 +179,16 @@ function New-LabDirectory {
 function Test-ShouldCapture {
     <#
     .SYNOPSIS
-        Returns $true if this lab and phase should be captured based on filters.
+        Returns $true if this lab, phase, and platform should be captured based on filters.
     #>
     param(
         [string]$Lab,
-        [string]$CapturePhase
+        [string]$CapturePhase,
+        [string]$CapturePlatform = ''
     )
     if ($LabFilter -and $Lab -ne $LabFilter) { return $false }
     if ($Phase -and $CapturePhase -ne $Phase) { return $false }
+    if ($CapturePlatform -and $Platform -ne 'both' -and $Platform -ne $CapturePlatform) { return $false }
     return $true
 }
 
@@ -387,6 +428,7 @@ Write-Host "`n=== Accessibility Scan Workshop Screenshot Capture ===" -Foregroun
 Write-Host "Output directory: $OutputDir" -ForegroundColor Gray
 Write-Host "Lab filter: $(if ($LabFilter) { $LabFilter } else { 'all' })" -ForegroundColor Gray
 Write-Host "Phase filter: $(if ($Phase) { "Phase $Phase" } else { 'all' })" -ForegroundColor Gray
+Write-Host "Platform: $Platform" -ForegroundColor Gray
 Write-Host "Theme: $Theme | Font size: $FontSize" -ForegroundColor Gray
 
 $requiredTools = @('freeze', 'node', 'npx')
@@ -480,21 +522,17 @@ if (Test-ShouldCapture -Lab '02' -CapturePhase '1') {
     $lab02Dir = New-LabDirectory -Lab '02'
 
     if ($ScannerRepoDir) {
-        # Capture CLI help output showing scan command
+        # Capture CLI help output by running built CLI directly
         Invoke-CapturedFreezeScreenshot `
-            -Command "cd '$ScannerRepoDir'; npx a11y-scan scan --help 2>&1 | Select-Object -First 40" `
+            -Command "cd '$ScannerRepoDir'; node dist/cli/bin/a11y-scan.js --help 2>&1 | Select-Object -First 40" `
             -OutputFile (Join-Path $lab02Dir 'lab-02-cli-output.png') `
             -Description 'CLI scan help output'
 
-        # Capture API endpoint info from scanner source
-        $engineFile = Join-Path $ScannerRepoDir 'src\lib\scanner\engine.ts'
-        if (Test-Path $engineFile) {
-            Invoke-FreezeFile `
-                -FilePath $engineFile `
-                -OutputFile (Join-Path $lab02Dir 'lab-02-api-response.png') `
-                -Description 'Scanner engine source (API reference)' `
-                -Language 'typescript'
-        }
+        # Capture scanner API response structure (first 50 lines of engine)
+        Invoke-CapturedFreezeScreenshot `
+            -Command "cd '$ScannerRepoDir'; Get-Content src\lib\scanner\engine.ts | Select-Object -First 50" `
+            -OutputFile (Join-Path $lab02Dir 'lab-02-api-response.png') `
+            -Description 'Scanner API response structure (first 50 lines)'
     }
 }
 
@@ -506,14 +544,14 @@ if (Test-ShouldCapture -Lab '03' -CapturePhase '1') {
     if ($ScannerRepoDir) {
         # Capture package.json showing accessibility-checker dependency
         Invoke-CapturedFreezeScreenshot `
-            -Command "cd '$ScannerRepoDir'; Get-Content package.json | Select-String -Pattern 'accessibility-checker|ibm|axe-core' -Context 1,1" `
+            -Command "cd '$ScannerRepoDir'; Write-Output '=== Scanner Engine Comparison ==='; Write-Output ''; Write-Output 'axe-core:'; (Get-Content package.json | ConvertFrom-Json).dependencies.'axe-core'; Write-Output ''; Write-Output 'IBM Equal Access:'; (Get-Content package.json | ConvertFrom-Json).dependencies.'accessibility-checker'" `
             -OutputFile (Join-Path $lab03Dir 'lab-03-comparison-table.png') `
-            -Description 'Scanner dependencies (axe vs IBM)'
+            -Description 'Scanner engine comparison (axe-core vs IBM)'
 
         # Capture deduplication logic if present
         $dedupeFiles = @(
-            (Join-Path $ScannerRepoDir 'src\lib\scanner\engine.ts'),
-            (Join-Path $ScannerRepoDir 'src\lib\report\sarif-generator.ts')
+            (Join-Path $ScannerRepoDir 'src\lib\report\sarif-generator.ts'),
+            (Join-Path $ScannerRepoDir 'src\lib\scanner\engine.ts')
         )
         foreach ($df in $dedupeFiles) {
             if (Test-Path $df) {
@@ -557,16 +595,31 @@ if (Test-ShouldCapture -Lab '04' -CapturePhase '1') {
                 -Language 'markdown'
         }
 
-        # Capture custom check run output placeholder
-        Invoke-CapturedFreezeScreenshot `
-            -Command "cd '$ScannerRepoDir'; npx a11y-scan scan --help 2>&1 | Select-Object -First 30" `
-            -OutputFile (Join-Path $lab04Dir 'lab-04-custom-check-results.png') `
-            -Description 'Custom check results (placeholder from CLI help)'
+        # Capture custom check implementation source
+        $customCheckResultsFile = Join-Path $ScannerRepoDir 'src\lib\scanner\custom-checks.ts'
+        if (Test-Path $customCheckResultsFile) {
+            Invoke-FreezeFile `
+                -FilePath $customCheckResultsFile `
+                -OutputFile (Join-Path $lab04Dir 'lab-04-custom-check-results.png') `
+                -Description 'Custom check implementation results' `
+                -Language 'typescript'
+        }
 
-        Invoke-CapturedFreezeScreenshot `
-            -Command "cd '$ScannerRepoDir'; npx a11y-scan scan --help 2>&1 | Select-Object -First 30" `
-            -OutputFile (Join-Path $lab04Dir 'lab-04-new-check-results.png') `
-            -Description 'New check results (placeholder from CLI help)'
+        # Capture new check results from e2e fixtures or custom-checks source
+        $newCheckFile = Join-Path $ScannerRepoDir 'e2e\fixtures\custom-checks.ts'
+        if (-not (Test-Path $newCheckFile)) {
+            $newCheckFile = Join-Path $ScannerRepoDir 'src\lib\scanner\checks\index.ts'
+        }
+        if (-not (Test-Path $newCheckFile)) {
+            $newCheckFile = Join-Path $ScannerRepoDir 'src\lib\scanner\custom-checks.ts'
+        }
+        if (Test-Path $newCheckFile) {
+            Invoke-FreezeFile `
+                -FilePath $newCheckFile `
+                -OutputFile (Join-Path $lab04Dir 'lab-04-new-check-results.png') `
+                -Description 'New check results implementation' `
+                -Language 'typescript'
+        }
     }
 }
 
@@ -687,6 +740,91 @@ if (Test-ShouldCapture -Lab '07' -CapturePhase '1') {
     }
 }
 
+# Lab 06-ado: ADO Advanced Security YAML and SARIF files
+if (Test-ShouldCapture -Lab '06-ado' -CapturePhase '1' -CapturePlatform 'ado') {
+    Write-Host "`n[Lab 06-ado] ADO Advanced Security files" -ForegroundColor Yellow
+    $lab06AdoDir = New-LabDirectory -Lab '06-ado'
+
+    if ($ScannerRepoDir) {
+        # SARIF file content
+        $sarifFiles = Get-ChildItem -Path (Join-Path $ScannerRepoDir 'results') -Filter '*.json' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($sarifFiles) {
+            Invoke-FreezeFile `
+                -FilePath $sarifFiles.FullName `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-sarif-file.png') `
+                -Description 'SARIF output file' `
+                -Language 'json'
+        }
+
+        # Pipeline YAML
+        $advsecPipeline = Join-Path $ScannerRepoDir '.azuredevops\pipelines\a11y-scan-advancedsecurity.yml'
+        if (Test-Path $advsecPipeline) {
+            Invoke-FreezeFile `
+                -FilePath $advsecPipeline `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-pipeline-yaml.png') `
+                -Description 'ADO Advanced Security pipeline YAML' `
+                -Language 'yaml'
+        }
+    }
+}
+
+# Lab 07-ado: ADO pipeline YAML files and templates
+if (Test-ShouldCapture -Lab '07-ado' -CapturePhase '1' -CapturePlatform 'ado') {
+    Write-Host "`n[Lab 07-ado] ADO pipeline files" -ForegroundColor Yellow
+    $lab07AdoDir = New-LabDirectory -Lab '07-ado'
+
+    if ($ScannerRepoDir) {
+        # Pipeline basics (ci.yml)
+        $ciPipeline = Join-Path $ScannerRepoDir '.azuredevops\pipelines\ci.yml'
+        if (Test-Path $ciPipeline) {
+            Invoke-FreezeFile `
+                -FilePath $ciPipeline `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-pipeline-basics.png') `
+                -Description 'ADO CI pipeline basics' `
+                -Language 'yaml'
+        }
+
+        # Scan matrix (a11y-scan.yml)
+        $scanPipeline = Join-Path $ScannerRepoDir '.azuredevops\pipelines\a11y-scan.yml'
+        if (Test-Path $scanPipeline) {
+            Invoke-FreezeFile `
+                -FilePath $scanPipeline `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-scan-matrix.png') `
+                -Description 'Multi-stage scan pipeline matrix' `
+                -Language 'yaml'
+        }
+
+        # Schedule syntax (scan-and-store.yml)
+        $schedulePipeline = Join-Path $ScannerRepoDir '.azuredevops\pipelines\scan-and-store.yml'
+        if (Test-Path $schedulePipeline) {
+            Invoke-FreezeFile `
+                -FilePath $schedulePipeline `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-schedule-syntax.png') `
+                -Description 'Schedule trigger syntax' `
+                -Language 'yaml'
+        }
+
+        # Templates directory listing
+        $templatesDir = Join-Path $ScannerRepoDir '.azuredevops\pipelines\templates'
+        if (Test-Path $templatesDir) {
+            Invoke-CapturedFreezeScreenshot `
+                -Command "Get-ChildItem '$templatesDir' -Name" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-templates-dir.png') `
+                -Description 'Pipeline templates directory listing'
+        }
+
+        # Template parameters (deploy-app-stage.yml)
+        $templateFile = Join-Path $ScannerRepoDir '.azuredevops\pipelines\templates\deploy-app-stage.yml'
+        if (Test-Path $templateFile) {
+            Invoke-FreezeFile `
+                -FilePath $templateFile `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-template-params.png') `
+                -Description 'Pipeline template parameters' `
+                -Language 'yaml'
+        }
+    }
+}
+
 # ── Phase 2: App-Dependent Captures ─────────────────────────────────────────
 # Screenshots requiring demo apps running (locally or deployed to Azure)
 
@@ -730,11 +868,13 @@ if (Test-ShouldCapture -Lab '01' -CapturePhase '2') {
         -OutputFile (Join-Path $lab01Dir 'lab-01-violations-popup.png') `
         -Description 'Popup modal violation (app 001)'
 
-    # DevTools audit is a browser screenshot
-    Invoke-PlaywrightScreenshot `
-        -Url $AppUrls['001'] `
+    # DevTools audit — capture scanner results overview as audit proxy
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab01Dir 'lab-01-devtools-audit.png') `
-        -Description 'DevTools accessibility audit placeholder'
+        -Action 'results' `
+        -Description 'Accessibility audit results overview'
 }
 
 # Lab 02: Web UI scan pages
@@ -785,10 +925,10 @@ if (Test-ShouldCapture -Lab '03' -CapturePhase '2') {
 
     Invoke-InteractiveScanCapture `
         -ScannerUrl $ScannerUrl `
-        -TargetUrl $AppUrls['001'] `
+        -TargetUrl $AppUrls['002'] `
         -OutputFile (Join-Path $lab03Dir 'lab-03-ibm-violation-detail.png') `
         -Action 'detail' `
-        -Description 'IBM violation detail'
+        -Description 'IBM violation detail (app 002)'
 
     Invoke-InteractiveScanCapture `
         -ScannerUrl $ScannerUrl `
@@ -803,15 +943,17 @@ if (Test-ShouldCapture -Lab '04' -CapturePhase '2') {
     Write-Host "`n[Lab 04] Keyboard navigation testing" -ForegroundColor Yellow
     $lab04Dir = New-LabDirectory -Lab '04'
 
-    Invoke-PlaywrightScreenshot `
-        -Url $AppUrls['001'] `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab04Dir 'lab-04-keyboard-test.png') `
-        -Description 'Keyboard navigation testing on demo app 001'
+        -Action 'detail' `
+        -Description 'Keyboard navigation test results'
 }
 
 # ── Phase 3: GitHub Web UI Captures ─────────────────────────────────────────
 # Screenshots requiring GitHub authentication and uploaded scan results
-
+if ($Platform -in @('github', 'both')) {
 Write-Host "`n── Phase 3: GitHub Web UI Captures ──" -ForegroundColor Cyan
 
 $GitHubBaseUrl = "https://github.com/$Org/accessibility-scan-demo-app"
@@ -834,10 +976,10 @@ if (Test-ShouldCapture -Lab '05' -CapturePhase '3') {
         -FullPage
 
     Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl/security/code-scanning" `
+        -Url "$GitHubBaseUrl/security/code-scanning/1" `
         -OutputFile (Join-Path $lab05Dir 'lab-05-alert-detail.png') `
         -StorageState $GitHubAuthState `
-        -Description 'Alert detail view'
+        -Description 'Alert detail view (specific alert)'
 
     Invoke-AuthenticatedPlaywrightScreenshot `
         -Url "$GitHubBaseUrl/security/code-scanning?query=severity%3Ahigh" `
@@ -846,10 +988,10 @@ if (Test-ShouldCapture -Lab '05' -CapturePhase '3') {
         -Description 'Filter by severity'
 
     Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl/security/code-scanning" `
+        -Url "$GitHubBaseUrl/security/code-scanning?query=is%3Aopen+sort%3Acreated-desc" `
         -OutputFile (Join-Path $lab05Dir 'lab-05-triage-view.png') `
         -StorageState $GitHubAuthState `
-        -Description 'Triage view'
+        -Description 'Triage view (open alerts sorted by date)'
 }
 
 # Lab 06: GitHub Actions pages
@@ -865,16 +1007,16 @@ if (Test-ShouldCapture -Lab '06' -CapturePhase '3') {
         -FullPage
 
     Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl/actions" `
+        -Url "$GitHubBaseUrl/actions/workflows/a11y-scan.yml" `
         -OutputFile (Join-Path $lab06Dir 'lab-06-matrix-jobs.png') `
         -StorageState $GitHubAuthState `
-        -Description 'Matrix jobs running'
+        -Description 'Matrix jobs in scan workflow'
 
     Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl/actions" `
+        -Url "$GitHubBaseUrl/actions/workflows/deploy-all.yml" `
         -OutputFile (Join-Path $lab06Dir 'lab-06-deploy-status.png') `
         -StorageState $GitHubAuthState `
-        -Description 'Deploy status'
+        -Description 'Deployment workflow status'
 }
 
 # Lab 07: Remediation PR and score changes
@@ -883,22 +1025,123 @@ if (Test-ShouldCapture -Lab '07' -CapturePhase '3') {
     $lab07Dir = New-LabDirectory -Lab '07'
 
     Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl/pulls" `
+        -Url "$GitHubBaseUrl/pulls?q=is%3Apr+is%3Aopen+label%3Aaccessibility" `
         -OutputFile (Join-Path $lab07Dir 'lab-07-remediation-pr.png') `
         -StorageState $GitHubAuthState `
-        -Description 'Remediation pull request'
+        -Description 'Accessibility remediation pull requests'
 
-    Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl" `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab07Dir 'lab-07-before-after.png') `
-        -StorageState $GitHubAuthState `
+        -Action 'comparison' `
         -Description 'Before/after score comparison'
 
-    Invoke-AuthenticatedPlaywrightScreenshot `
-        -Url "$GitHubBaseUrl" `
+    Invoke-InteractiveScanCapture `
+        -ScannerUrl $ScannerUrl `
+        -TargetUrl $AppUrls['001'] `
         -OutputFile (Join-Path $lab07Dir 'lab-07-score-improvement.png') `
-        -StorageState $GitHubAuthState `
-        -Description 'Score improvement chart'
+        -Action 'results' `
+        -Description 'Score improvement visualization'
+}
+
+} # end Phase 3 GitHub platform gate
+
+# ── Phase 4: ADO Web UI Captures ────────────────────────────────────────────
+# Screenshots requiring Azure DevOps authentication
+
+if ($Platform -in @('ado', 'both')) {
+    Write-Host "`n── Phase 4: ADO Web UI Captures ──" -ForegroundColor Cyan
+
+    if (-not (Test-Path $AdoAuthState)) {
+        Write-Host "  ADO auth state not found at '$AdoAuthState'. Phase 4 captures will be skipped." -ForegroundColor Yellow
+        Write-Host "  To set up auth: npx playwright codegen --save-storage=$AdoAuthState dev.azure.com" -ForegroundColor Yellow
+    }
+    else {
+        # Lab 06-ado: ADO Advanced Security pages
+        if (Test-ShouldCapture -Lab '06-ado' -CapturePhase '4' -CapturePlatform 'ado') {
+            Write-Host "`n[Lab 06-ado] ADO Advanced Security pages" -ForegroundColor Yellow
+            $lab06AdoDir = New-LabDirectory -Lab '06-ado'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_settings/repositories" `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-advsec-settings.png') `
+                -StorageState $AdoAuthState `
+                -Description 'ADO Advanced Security settings panel'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_settings/repositories" `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-advsec-enable.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Enable Advanced Security confirmation'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_build" `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-pipeline-run.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Pipeline execution run view'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_build" `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-pipeline-logs.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Pipeline logs showing SARIF upload'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoAdvSecUrl/_advsec/overview" `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-advsec-overview.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Advanced Security Overview dashboard'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoAdvSecUrl/_advsec/alerts" `
+                -OutputFile (Join-Path $lab06AdoDir 'lab-06-ado-advsec-alerts.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Alerts listed by severity'
+        }
+
+        # Lab 07-ado: ADO Pipeline pages
+        if (Test-ShouldCapture -Lab '07-ado' -CapturePhase '4' -CapturePlatform 'ado') {
+            Write-Host "`n[Lab 07-ado] ADO Pipeline pages" -ForegroundColor Yellow
+            $lab07AdoDir = New-LabDirectory -Lab '07-ado'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_library?itemType=VariableGroups" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-variable-groups.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Variable groups in ADO portal'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_environments" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-environments.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Environments list in ADO'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_environments" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-approval-gate.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Approval gate configuration'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_build" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-scan-run.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Scan pipeline run view'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_build" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-deploy-stages.png') `
+                -StorageState $AdoAuthState `
+                -Description 'Multi-stage deployment view'
+
+            Invoke-AuthenticatedPlaywrightScreenshot `
+                -Url "$AdoBaseUrl/_workitems" `
+                -OutputFile (Join-Path $lab07AdoDir 'lab-07-ado-workitem-link.png') `
+                -StorageState $AdoAuthState `
+                -Description 'AB# work item linked from commit'
+        }
+    }
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────
@@ -909,6 +1152,7 @@ $Elapsed = $Stopwatch.Elapsed
 Write-Host "`n=== Screenshot Capture Summary ===" -ForegroundColor Cyan
 Write-Host "  Captured:  $($script:CaptureCount)" -ForegroundColor $(if ($script:CaptureCount -gt 0) { 'Green' } else { 'Yellow' })
 Write-Host "  Failed:    $($script:FailureCount)" -ForegroundColor $(if ($script:FailureCount -gt 0) { 'Red' } else { 'Green' })
+Write-Host "  Platform:  $Platform" -ForegroundColor Gray
 Write-Host "  Elapsed:   $($Elapsed.ToString('mm\:ss'))" -ForegroundColor Gray
 Write-Host ""
 

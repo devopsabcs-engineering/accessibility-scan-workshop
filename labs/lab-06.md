@@ -12,6 +12,10 @@ description: "Build automated scanning pipelines with matrix strategy, OIDC auth
 | **Level** | Advanced |
 | **Prerequisites** | [Lab 05](lab-05.md), Azure subscription (Exercises 6.3–6.5) |
 
+> [!TIP]
+> This lab covers the **GitHub Actions** workflow. For the Azure DevOps
+> variant, see [Lab 06-ado: ADO Advanced Security](lab-06-ado.md).
+
 ## Learning Objectives
 
 By the end of this lab, you will be able to:
