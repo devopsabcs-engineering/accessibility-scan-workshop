@@ -937,10 +937,10 @@ if (Test-ShouldCapture -Lab '04' -CapturePhase '2') {
 
     Invoke-InteractiveScanCapture `
         -ScannerUrl $ScannerUrl `
-        -TargetUrl $AppUrls['001'] `
+        -TargetUrl $AppUrls['004'] `
         -OutputFile (Join-Path $lab04Dir 'lab-04-keyboard-test.png') `
-        -Action 'detail' `
-        -Description 'Keyboard navigation test results'
+        -Action 'results' `
+        -Description 'Keyboard navigation test results (app 004)'
 }
 
 # ── Phase 3: GitHub Web UI Captures ─────────────────────────────────────────
