@@ -5,6 +5,10 @@ nav_order: 0
 permalink: /
 ---
 
+<p align="center">
+  <img src="assets/branding/logo-128.png" alt="Agentic Accelerator Framework" width="100">
+</p>
+
 # Accessibility Scan Workshop
 
 Welcome to the **Accessibility Scan Workshop** — a hands-on, progressive workshop that teaches you how to scan web applications for WCAG 2.2 accessibility violations using axe-core, IBM Equal Access, and custom Playwright checks.
