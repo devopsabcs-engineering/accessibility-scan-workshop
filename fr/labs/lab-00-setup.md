@@ -1,4 +1,5 @@
 ---
+nav_exclude: true
 permalink: /fr/labs/lab-00-setup
 title: "Lab 00 : Prérequis et configuration de l'environnement"
 description: "Configurez votre environnement avec tous les outils nécessaires pour l'analyse d'accessibilité WCAG 2.2."

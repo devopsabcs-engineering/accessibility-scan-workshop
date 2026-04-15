@@ -1,4 +1,5 @@
 ---
+nav_exclude: true
 permalink: /fr/labs/lab-02
 title: "Labo 02 : axe-core — Tests d'accessibilité automatisés"
 description: "Analyser des pages web à la recherche de violations WCAG à l'aide d'axe-core via l'interface web du scanner, la CLI et l'API."

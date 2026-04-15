@@ -1,4 +1,5 @@
 ---
+nav_exclude: true
 permalink: /fr/labs/lab-06
 title: "Labo 06 : Pipelines GitHub Actions et portes de contrôle de scan"
 description: "Construisez des pipelines de scan automatisés avec une stratégie matricielle, l'authentification OIDC et des portes de qualité basées sur des seuils."

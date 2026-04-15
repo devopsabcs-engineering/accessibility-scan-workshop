@@ -1,4 +1,5 @@
 ---
+nav_exclude: true
 permalink: /fr/labs/lab-07
 title: "Labo 07 : Flux de remédiation avec les agents Copilot"
 description: "Utilisez les agents GitHub Copilot pour détecter, prioriser et corriger automatiquement les violations d'accessibilité."

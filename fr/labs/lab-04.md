@@ -1,4 +1,5 @@
 ---
+nav_exclude: true
 permalink: /fr/labs/lab-04
 title: "Labo 04 : Vérifications Playwright personnalisées — Automatisation de l'inspection manuelle"
 description: "Étendez la couverture du scanner avec des vérifications d'accessibilité personnalisées basées sur Playwright, au-delà des moteurs automatisés."

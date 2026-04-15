@@ -1,4 +1,5 @@
 ---
+nav_exclude: true
 permalink: /fr/labs/lab-06-ado
 title: "Labo 06-ado : ADO Advanced Security et intégration SARIF"
 description: "Activer Azure DevOps Advanced Security, publier les résultats SARIF via un pipeline et comparer les résultats avec GitHub Security."
