@@ -1,5 +1,6 @@
 ---
 nav_exclude: true
+lang: fr
 permalink: /fr/labs/lab-01
 title: "Labo 01 : Explorer les applications de démonstration et les violations WCAG"
 description: "Comprendre les 5 applications de démonstration délibérément inaccessibles et associer leurs violations aux principes WCAG 2.2."

@@ -1,5 +1,6 @@
 ---
 nav_exclude: true
+lang: fr
 permalink: /fr/labs/lab-05
 title: "Labo 05 : Sortie SARIF et onglet Sécurité GitHub"
 description: "Générer une sortie SARIF à partir des analyses d'accessibilité et téléverser les résultats vers l'onglet Sécurité de GitHub."

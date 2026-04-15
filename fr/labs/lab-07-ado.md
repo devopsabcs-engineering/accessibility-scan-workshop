@@ -1,5 +1,6 @@
 ---
 nav_exclude: true
+lang: fr
 permalink: /fr/labs/lab-07-ado
 title: "Labo 07-ado : Pipelines YAML ADO pour l'analyse d'accessibilité"
 description: "Créer et configurer des pipelines YAML Azure DevOps pour l'analyse automatisée de l'accessibilité, la réutilisation de modèles et le lien avec les éléments de travail."

@@ -1,5 +1,6 @@
 ---
 nav_exclude: true
+lang: fr
 permalink: /fr/labs/lab-03
 title: "Labo 03 : IBM Equal Access — Analyse complète basée sur les politiques"
 description: "Analyser des pages web à l'aide du vérificateur IBM Equal Access pour une analyse d'accessibilité basée sur les politiques."
