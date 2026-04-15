@@ -108,6 +108,8 @@ See [Lab 00: Prerequisites](labs/lab-00-setup.md) for detailed installation inst
 
 > **Tip**: This workshop is designed for GitHub Codespaces. Click **Code → Codespaces → New codespace** to get a pre-configured environment with all tools installed.
 
+> 🇫🇷 **[Version française](fr/)**
+
 ## Related Repositories
 
 | Repository | Description |
