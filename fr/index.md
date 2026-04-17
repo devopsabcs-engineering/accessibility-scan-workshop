@@ -120,3 +120,4 @@ Consultez le [Lab 00 : Prérequis](labs/lab-00-setup.md) pour les instructions d
 | [Agentic Accelerator Workshop](https://devopsabcs-engineering.github.io/agentic-accelerator-workshop/) | Atelier pratique pour les agents Accelerator alimentés par l'IA |
 | [FinOps Scan Workshop](https://devopsabcs-engineering.github.io/finops-scan-workshop/) | Atelier d'analyse de gouvernance des coûts Azure |
 | [Code Quality Scan Workshop](https://devopsabcs-engineering.github.io/code-quality-scan-workshop/) | Atelier d'analyse de qualité du code |
+| [APM Security Scan Workshop](https://devopsabcs-engineering.github.io/apm-security-scan-workshop/) | Atelier d'analyse de sécurité des fichiers de configuration d'agents |
